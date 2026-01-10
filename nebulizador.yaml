@@ -1,0 +1,169 @@
+substitutions:
+  name: "nebulizador"
+  friendly_name: "Nebulizador"
+  device_description: "Nebulizador de aire frio"
+
+esphome: 
+  name: "${name}"
+  friendly_name: "${friendly_name}"
+  comment: "${device_description}"
+
+  project:
+    name: "luisma.nebulizador"
+    version: "1.0.0"  
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+    version: recommended
+
+
+# Enable Home Assistant API
+api:
+  services:
+    - service: fire
+      variables:
+        duration_s: int
+      then:
+        # Si ya está corriendo, no haces nada (mode: single también lo evita,
+        # pero esto te permite "rechazar" temprano en el service)
+        - if:
+            condition:
+              lambda: 'return id(is_running);'
+            then:
+              - logger.log: "Nebulizer already running; ignoring fire()"
+            else:
+              - script.execute:
+                  id: do_fire
+                  duration_ms: !lambda |-
+                    int s = duration_s;
+                    if (s < 1) s = 1;
+                    if (s > 300) s = 300;   // maximo 5 minutos
+                    return s * 1000;
+    - service: fire_default
+      then:
+        - if:
+            condition:
+              lambda: 'return id(is_running);'
+            then:
+              - logger.log: "Nebulizer already running; ignoring fire_default()"
+            else:
+              - script.execute:
+                  id: do_fire
+                  duration_ms: !lambda "return (int)(id(duration).state * 1000);"
+
+ota:
+  - platform: esphome
+
+logger:  
+
+wifi:
+ ap: {}
+    # ssid: "Nebulizador Hotspot"
+    # password: "12345678"
+
+captive_portal:
+
+
+dashboard_import:
+  package_import_url: not-github://athom-tech/esp32-configs/athom-rgbcw-light.yaml
+
+debug:
+
+
+globals:
+  - id: is_running
+    type: bool
+    restore_value: false
+    initial_value: "false"
+
+binary_sensor:
+  - platform: template
+    name: "Running"
+    id: nebulizer_running
+    lambda: |-
+      return id(is_running);
+    entity_category: diagnostic
+
+
+output:
+  - platform: gpio
+    pin: GPIO12
+    id: hbridge_low
+    inverted: false
+
+  - platform: gpio
+    pin: GPIO13
+    id: hbridge_toggle
+    inverted: false
+
+number:
+  - platform: template
+    icon: mdi:spray
+    mode: BOX
+    name: "Duration"
+    id: duration
+    optimistic: true
+    min_value: 1
+    max_value: 300
+    step: 1
+    unit_of_measurement: "s"
+    restore_value: true
+    initial_value: 5
+    device_class: duration
+
+script:
+  - id: do_fire
+    mode: single
+    parameters:
+      duration_ms: int
+    then:
+      - lambda: |-
+          id(is_running) = true;
+      - output.turn_off: hbridge_low
+      - output.turn_on: hbridge_toggle
+      - delay: !lambda "return duration_ms;"
+      - output.turn_off: hbridge_toggle
+      - lambda: |-
+          id(is_running) = false;
+
+button:
+  - platform: template
+    name: "Fire Nebulizer"
+    on_press:
+      - if:
+          condition:
+            lambda: 'return id(is_running);'
+          then:
+            - logger.log: "Nebulizer already running; ignoring button press"
+          else:
+            - script.execute:
+                id: do_fire
+                duration_ms: !lambda "return (int)(id(duration).state * 1000);"
+
+  - platform: restart
+    name: "Restart Device"
+    entity_category: config              
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: "IP Address"
+  - platform: debug
+    # device:
+    #   name: "Device Info"
+    reset_reason:
+      name: "Reset Reason"      
+sensor:
+  - platform: uptime
+    name: "Uptime"
+  # - platform: debug
+  #   free:
+  #     name: "Heap Free"
+  #   block:
+  #     name: "Heap Max Block"
+  #   loop_time:
+  #     name: "Loop Time"
+  #   cpu_frequency:
+  #     name: "CPU Frequency"
