@@ -60,17 +60,17 @@ logger:
 
 wifi:
  ap: {}
-    # ssid: "Nebulizador Hotspot"
-    # password: "12345678"
 
 captive_portal:
 
+esp32_improv:
+  authorizer: none
+
 
 dashboard_import:
-  package_import_url: not-github://athom-tech/esp32-configs/athom-rgbcw-light.yaml
+  package_import_url: github://luismasg/nebulizador-esphome-config/nebulizador.yaml
 
 debug:
-
 
 globals:
   - id: is_running
@@ -85,7 +85,6 @@ binary_sensor:
     lambda: |-
       return id(is_running);
     entity_category: diagnostic
-
 
 output:
   - platform: gpio
