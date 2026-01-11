@@ -7,17 +7,12 @@ esphome:
   name: "${name}"
   friendly_name: "${friendly_name}"
   comment: "${device_description}"
-
-  project:
-    name: "luisma.nebulizador"
-    version: "1.0.0"  
-
+ 
 esp32:
   board: esp32dev
   framework:
     type: esp-idf
     version: recommended
-
 
 # Enable Home Assistant API
 api:
